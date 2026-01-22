@@ -1,21 +1,31 @@
 /**
  * Doodstream Video Link Extractor
- * Uses Puppeteer to extract direct video links from Doodstream pages
+ * Uses Puppeteer with Stealth Plugin to extract direct video links
+ * Stealth mode helps bypass anti-bot detection
  */
 
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const { delay } = require('./utils');
+const logger = require('./logger');
+
+// Add stealth plugin
+puppeteer.use(StealthPlugin());
 
 class DoodstreamExtractor {
     constructor() {
         this.browser = null;
+        // FAST MODE: Enabled for speed
+        this.FAST_MODE = true;
+        this.BLOCKED_RESOURCES = ['image', 'font', 'stylesheet'];
     }
 
     /**
-     * Initialize browser instance
+     * Initialize browser instance with stealth and optimized settings
      */
     async init() {
         if (!this.browser) {
+            logger.info('[Puppeteer] Launching browser with Stealth mode...');
             this.browser = await puppeteer.launch({
                 headless: 'new',
                 args: [
@@ -24,10 +34,20 @@ class DoodstreamExtractor {
                     '--disable-dev-shm-usage',
                     '--disable-accelerated-2d-canvas',
                     '--disable-gpu',
-                    '--window-size=1920x1080',
-                    '--disable-blink-features=AutomationControlled'
+                    '--window-size=1280x720',
+                    '--disable-blink-features=AutomationControlled',
+                    // Performance optimizations
+                    '--disable-extensions',
+                    '--disable-plugins',
+                    '--disable-images',
+                    '--disable-background-networking',
+                    '--disable-sync',
+                    '--disable-translate',
+                    '--no-first-run',
+                    '--safebrowsing-disable-auto-update'
                 ]
             });
+            logger.success('[Puppeteer] Browser ready (Stealth mode)');
         }
         return this.browser;
     }
@@ -68,6 +88,98 @@ class DoodstreamExtractor {
             delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
             delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
         });
+    }
+
+    /**
+     * Generate unique param for video URL (same algorithm as Doodstream)
+     */
+    generateUniqueParam(token) {
+        let a = "";
+        const t = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        for (let o = 0; o < 10; o++) {
+            a += t.charAt(Math.floor(Math.random() * t.length));
+        }
+        return a + `?token=${token}&expiry=` + Date.now();
+    }
+
+    /**
+     * FAST METHOD: Extract pass_md5 and token from page, then generate URL via HTTP
+     * Much faster than waiting for video to load in browser
+     */
+    async extractViaPassMd5(page, baseUrl) {
+        const axios = require('axios');
+
+        try {
+            // Extract pass_md5 path and token from page scripts
+            const extractedData = await page.evaluate(() => {
+                const scripts = document.querySelectorAll('script');
+                let passMd5 = null;
+                let token = null;
+
+                for (const script of scripts) {
+                    const content = script.textContent || script.innerHTML;
+
+                    // Look for pass_md5 path
+                    const passMd5Match = content.match(/\/pass_md5\/([^\/'"]+\/[^'"]+)/);
+                    if (passMd5Match) {
+                        passMd5 = passMd5Match[1];
+                    }
+
+                    // Look for token
+                    const tokenMatch = content.match(/[?&]token=([a-zA-Z0-9]+)/);
+                    if (tokenMatch) {
+                        token = tokenMatch[1];
+                    }
+
+                    // Alternative token pattern
+                    if (!token) {
+                        const altToken = content.match(/makePlay\s*\(\s*\)\s*\{[\s\S]*?token\s*=\s*['"]([^'"]+)['"]/);
+                        if (altToken) {
+                            token = altToken[1];
+                        }
+                    }
+                }
+
+                return { passMd5, token };
+            });
+
+            if (!extractedData.passMd5) {
+                console.log('[Doodstream] pass_md5 not found in page');
+                return null;
+            }
+
+            console.log(`[Doodstream] Found pass_md5: ${extractedData.passMd5.substring(0, 20)}...`);
+
+            // Get base URL from the page (might have redirected)
+            const pageUrl = page.url();
+            const pageOrigin = new URL(pageUrl).origin;
+
+            // Call pass_md5 endpoint
+            const passMd5Url = `${pageOrigin}/pass_md5/${extractedData.passMd5}`;
+            console.log(`[Doodstream] Calling pass_md5 endpoint...`);
+
+            const response = await axios.get(passMd5Url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Referer': pageUrl,
+                    'Accept': '*/*'
+                },
+                timeout: 10000
+            });
+
+            if (response.data && typeof response.data === 'string' && response.data.includes('http')) {
+                // Generate video URL with unique param
+                const token = extractedData.token || 'notoken';
+                const videoUrl = response.data + this.generateUniqueParam(token);
+                console.log(`[Doodstream] Generated video URL via pass_md5!`);
+                return videoUrl;
+            }
+
+            return null;
+        } catch (error) {
+            console.log(`[Doodstream] pass_md5 extraction failed: ${error.message}`);
+            return null;
+        }
     }
 
     /**
@@ -127,13 +239,21 @@ class DoodstreamExtractor {
 
             page.on('request', request => {
                 const reqUrl = request.url();
+                const resourceType = request.resourceType();
 
-                // Check for video stream URLs (including cloudatacdn which is used by doodstream/myvidplay)
+                // FAST MODE: Block unnecessary resources
+                if (this.FAST_MODE && this.BLOCKED_RESOURCES.includes(resourceType)) {
+                    request.abort();
+                    return;
+                }
+
+                // Check for video stream URLs
                 if (reqUrl.includes('.mp4') ||
                     reqUrl.includes('.m3u8') ||
                     reqUrl.includes('/download') ||
                     reqUrl.includes('get_file') ||
-                    reqUrl.includes('cloudatacdn.com')) {
+                    reqUrl.includes('cloudatacdn.com') ||
+                    reqUrl.includes('streaming')) {
                     capturedUrls.push(reqUrl);
                 }
 
@@ -159,15 +279,15 @@ class DoodstreamExtractor {
                 console.log(`[Doodstream] Converting /s/ to /e/: ${targetUrl}`);
             }
 
-            // Navigate to the page (allow redirects)
+            // Navigate to the page (FAST MODE uses domcontentloaded)
             console.log(`[Doodstream] Navigating to: ${targetUrl}`);
             await page.goto(targetUrl, {
-                waitUntil: 'networkidle2',
-                timeout: 30000
+                waitUntil: 'domcontentloaded',
+                timeout: 15000
             });
 
-            // Wait for page to load and check for redirects
-            await delay(2000);
+            // Quick wait
+            await delay(300);
 
             // Get final URL after any redirects
             let finalUrl = page.url();
@@ -179,11 +299,11 @@ class DoodstreamExtractor {
             if (finalUrl === 'about:blank' || finalUrl === '') {
                 console.log('[Doodstream] Page is blank, looking for popup tabs...');
 
-                // Try multiple times to find popup
+                // FAST MODE: Fewer retries with shorter delays
                 let foundPopup = false;
-                for (let retry = 0; retry < 3 && !foundPopup; retry++) {
-                    // Wait for popups to open
-                    await delay(1500);
+                const maxRetries = 2;
+                for (let retry = 0; retry < maxRetries && !foundPopup; retry++) {
+                    await delay(300);
 
                     const pages = await this.browser.pages();
                     console.log(`[Doodstream] Attempt ${retry + 1}: Found ${pages.length} pages`);
@@ -214,7 +334,7 @@ class DoodstreamExtractor {
                                 request.continue();
                             });
 
-                            await delay(2000);
+                            await delay(500);
                             break;
                         }
                     }
@@ -262,6 +382,16 @@ class DoodstreamExtractor {
                 console.log('[Doodstream] Could not extract thumbnail');
             }
 
+            // FAST METHOD: Try to extract via pass_md5 first (much faster!)
+            console.log('[Doodstream] Trying FAST pass_md5 extraction...');
+            const passMd5Url = await this.extractViaPassMd5(page, finalUrl);
+            if (passMd5Url) {
+                capturedUrls.push(passMd5Url);
+                console.log('[Doodstream] FAST extraction successful!');
+            } else {
+                console.log('[Doodstream] FAST extraction failed, falling back to click method...');
+            }
+
             // Multiple click attempts to bypass ads (first clicks often trigger popups)
             for (let clickAttempt = 1; clickAttempt <= 3; clickAttempt++) {
                 try {
@@ -269,7 +399,7 @@ class DoodstreamExtractor {
 
                     // Click in center of video area
                     await page.mouse.click(960, 400);
-                    await delay(1500);
+                    await delay(500);
 
                     // Check if video src is already set
                     const hasVideoSrc = await page.evaluate(() => {
@@ -286,7 +416,7 @@ class DoodstreamExtractor {
                     const playButton = await page.$('.plyr__control--overlaid, .play-btn, [data-plyr="play"], .vjs-big-play-button, .vjs-play-control');
                     if (playButton) {
                         await playButton.click();
-                        await delay(1000);
+                        await delay(300);
                     }
                 } catch (e) {
                     console.log(`[Doodstream] Click attempt ${clickAttempt} failed`);
@@ -299,7 +429,7 @@ class DoodstreamExtractor {
                 await page.waitForFunction(() => {
                     const video = document.querySelector('video');
                     return video && video.src && video.src.startsWith('http');
-                }, { timeout: 15000 });
+                }, { timeout: 12000 });
             } catch (e) {
                 console.log('[Doodstream] Video src wait timeout, trying alternative methods');
             }
@@ -363,8 +493,8 @@ class DoodstreamExtractor {
                 capturedUrls.push(scriptVideoUrl);
             }
 
-            // Wait a bit more for any remaining network requests
-            await delay(2000);
+            // Quick wait for network
+            await delay(500);
 
             // Find the best video URL from captured URLs
             videoUrl = this.selectBestUrl(capturedUrls);
@@ -478,7 +608,7 @@ class DoodstreamExtractor {
     selectBestUrl(urls) {
         if (!urls || urls.length === 0) return null;
 
-        // Filter unique URLs and exclude tracking/analytics URLs
+        // Filter unique URLs and exclude tracking/analytics/ad URLs
         const excludePatterns = [
             'google-analytics',
             'googletagmanager',
@@ -496,7 +626,19 @@ class DoodstreamExtractor {
             '.gif',
             '.ico',
             '.svg',
-            '.woff'
+            '.woff',
+            // Ad networks
+            'bartcons.com',
+            'adtng.com',
+            'adzerk',
+            'adserver',
+            'popads',
+            'exoclick',
+            'juicyads',
+            'trafficjunky',
+            'propellerads',
+            '/vmon/',
+            'SSP%20LINK'
         ];
 
         const uniqueUrls = [...new Set(urls)].filter(url => {

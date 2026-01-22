@@ -78,5 +78,365 @@
     "amount": -15,
     "description": "Download video (-15 quota)",
     "timestamp": "2026-01-22T02:53:53.523Z"
+  },
+  {
+    "id": "txn_1769051046525_r1w6hvxrc",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:04:06.525Z"
+  },
+  {
+    "id": "txn_1769051115714_07ktdrgic",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:05:15.714Z"
+  },
+  {
+    "id": "txn_1769051149916_0ivuk0zmj",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:05:49.916Z"
+  },
+  {
+    "id": "txn_1769051194666_y4l791hle",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:06:34.666Z"
+  },
+  {
+    "id": "txn_1769051254043_uhvb7x757",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:07:34.043Z"
+  },
+  {
+    "id": "txn_1769051267451_5gjji2prr",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:07:47.451Z"
+  },
+  {
+    "id": "txn_1769051913113_je1eaqyq7",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:18:33.113Z"
+  },
+  {
+    "id": "txn_1769051913113_k774mnij3",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:18:33.113Z"
+  },
+  {
+    "id": "txn_1769051913114_8o74e899b",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:18:33.114Z"
+  },
+  {
+    "id": "txn_1769051913114_wy9xvrsm1",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:18:33.114Z"
+  },
+  {
+    "id": "txn_1769051913115_3olcrxp56",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:18:33.115Z"
+  },
+  {
+    "id": "txn_1769051977780_c5jhp2me2",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:19:37.780Z"
+  },
+  {
+    "id": "txn_1769052079638_42k5oz995",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:21:19.638Z"
+  },
+  {
+    "id": "txn_1769053032492_yzp4r03xy",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:37:12.492Z"
+  },
+  {
+    "id": "txn_1769053032493_mfosvdrhk",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:37:12.493Z"
+  },
+  {
+    "id": "txn_1769053032494_3boj12qs2",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:37:12.494Z"
+  },
+  {
+    "id": "txn_1769053032494_zabjyc7co",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:37:12.494Z"
+  },
+  {
+    "id": "txn_1769053825650_465nwdljz",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T03:50:25.650Z"
+  },
+  {
+    "id": "txn_1769054618197_nkpwe3m88",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:03:38.197Z"
+  },
+  {
+    "id": "txn_1769054766345_wxw5l5wjh",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:06:06.345Z"
+  },
+  {
+    "id": "txn_1769054806206_8if8p27ea",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:06:46.206Z"
+  },
+  {
+    "id": "txn_1769055286508_nlipbjvy6",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:14:46.508Z"
+  },
+  {
+    "id": "txn_1769055286509_tjs8cf5t5",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:14:46.509Z"
+  },
+  {
+    "id": "txn_1769055286510_d8jft0vqc",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:14:46.510Z"
+  },
+  {
+    "id": "txn_1769055286511_obsal4pag",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:14:46.511Z"
+  },
+  {
+    "id": "txn_1769055286512_1t28p9k6w",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:14:46.512Z"
+  },
+  {
+    "id": "txn_1769055305740_8wcqsry2z",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:15:05.740Z"
+  },
+  {
+    "id": "txn_1769055305741_xrykznvtn",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:15:05.741Z"
+  },
+  {
+    "id": "txn_1769055305742_f85wztdd4",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:15:05.742Z"
+  },
+  {
+    "id": "txn_1769055305743_guoo6yh26",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:15:05.743Z"
+  },
+  {
+    "id": "txn_1769055305743_godwvxrc1",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:15:05.743Z"
+  },
+  {
+    "id": "txn_1769056016331_y2o1sz27r",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:26:56.331Z"
+  },
+  {
+    "id": "txn_1769056184768_aunw44qtf",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:29:44.768Z"
+  },
+  {
+    "id": "txn_1769056282320_xq993rejr",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:31:22.320Z"
+  },
+  {
+    "id": "txn_1769056282321_ksbq3548p",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:31:22.321Z"
+  },
+  {
+    "id": "txn_1769056282321_sl2okjjwi",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:31:22.321Z"
+  },
+  {
+    "id": "txn_1769056898312_73q8iwz9n",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:41:38.312Z"
+  },
+  {
+    "id": "txn_1769057118559_hjelzm102",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:45:18.559Z"
+  },
+  {
+    "id": "txn_1769057912882_8kww5d57v",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:58:32.882Z"
+  },
+  {
+    "id": "txn_1769057912882_bbzgjnjsr",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:58:32.882Z"
+  },
+  {
+    "id": "txn_1769057912883_lwgw4brbr",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:58:32.883Z"
+  },
+  {
+    "id": "txn_1769057912884_no7we2udi",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:58:32.884Z"
+  },
+  {
+    "id": "txn_1769057912884_8b5ow7t08",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:58:32.884Z"
+  },
+  {
+    "id": "txn_1769057961488_u5zao914o",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T04:59:21.488Z"
+  },
+  {
+    "id": "txn_1769063220285_7j47pdc6r",
+    "userId": "1996372166",
+    "type": "topup",
+    "amount": 100000,
+    "description": "Admin top up (+100000 quota)",
+    "timestamp": "2026-01-22T06:27:00.285Z"
   }
 ]

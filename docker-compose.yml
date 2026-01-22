@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  doodstream-bot:
+    build: .
+    container_name: doodstream-bot
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      - NODE_ENV=production
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    
+    # Use .env file for secrets
+    env_file:
+      - .env
+    
+    # Persistent volumes
+    volumes:
+      - ./data:/app/data
+      - ./downloads:/app/downloads
+    
+    # Expose webhook port
+    ports:
+      - "3000:3000"
+    
+    # Shared memory for Puppeteer
+    shm_size: '2gb'
+    
+    # Security options for Puppeteer
+    security_opt:
+      - seccomp:unconfined
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -327,31 +327,11 @@ _Order ID: ${result.orderId}_
         // Delete batch from pending
         bot.pendingBatch.delete(batchId);
 
-        // Update message to show progress
-        await ctx.editMessageText(
-            `📦 *Batch Download Started!*\n\n` +
-            `🔗 Total: ${urls.length} video\n` +
-            `⏳ Memproses ke antrian...\n\n` +
-            `_Progress akan dikirim per video._`,
-            { parse_mode: 'Markdown' }
-        );
+        // Delete confirmation message
+        await ctx.deleteMessage().catch(() => { });
 
-        // Add all URLs to queue (skip cooldown and quota check since we already verified)
-        let queued = 0;
-        for (const url of urls) {
-            await bot.handleDownload(ctx, url, { skipCooldown: true, skipQuotaCheck: true });
-            queued++;
-
-            // Small delay between adds
-            await new Promise(r => setTimeout(r, 100));
-        }
-
-        await ctx.reply(
-            `✅ *${queued} video* ditambahkan ke antrian!\n\n` +
-            `📋 Video akan diproses secara berurutan.\n` +
-            `💰 Total biaya: ${totalCost} quota`,
-            { parse_mode: 'Markdown' }
-        );
+        // Use new batch download method - downloads all first, then sends all
+        await bot.handleBatchDownload(ctx, urls);
     });
 }
 

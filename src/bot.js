@@ -5,10 +5,13 @@ const path = require('path');
 
 // Core modules
 const DoodstreamExtractor = require('./doodstream');
+const YtdlpExtractor = require('./ytdlp');
+const HttpRegexExtractor = require('./http-extractor');
 const QuotaManager = require('./quota');
 const PaymentHandler = require('./payment');
-const { isValidDoodstreamUrl, formatFileSize, extractUrls } = require('./utils');
+const { isValidDoodstreamUrl, formatFileSize, extractUrls, isRedirectWrapper, followRedirect } = require('./utils');
 const messages = require('./messages');
+const logger = require('./logger');
 
 // Handler modules
 const setupCommandHandlers = require('./handlers/commands');
@@ -29,7 +32,22 @@ class DoodstreamBot {
         }
 
         this.bot = new Telegraf(token, telegrafOptions);
-        this.extractor = new DoodstreamExtractor();
+
+        // Choose extractor based on environment variable
+        // EXTRACTOR_MODE: puppeteer (default), ytdlp, or http
+        const extractorMode = process.env.EXTRACTOR_MODE || 'puppeteer';
+        if (extractorMode === 'ytdlp') {
+            this.extractor = new YtdlpExtractor();
+            console.log('🎬 Extractor Mode: yt-dlp (fast)');
+        } else if (extractorMode === 'http') {
+            this.extractor = new HttpRegexExtractor();
+            console.log('🎬 Extractor Mode: HTTP Regex (very fast)');
+        } else {
+            this.extractor = new DoodstreamExtractor();
+            console.log('🎬 Extractor Mode: Puppeteer (browser)');
+        }
+        this.extractorMode = extractorMode;
+
         this.quotaManager = new QuotaManager('./data');
         this.paymentHandler = new PaymentHandler(process.env.CASHI_API_KEY || '', './data');
 
@@ -202,16 +220,50 @@ class DoodstreamBot {
         }, 3000);
 
         try {
-            // Extract video info
-            const videoInfo = await Promise.race([
-                this.extractor.extractVideoInfo(url),
-                new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Extraction timeout')), 60000)
-                )
-            ]);
+            let videoInfo;
+            let targetUrl = url;
 
-            extractionDone = true;
-            clearInterval(animationInterval);
+            // Check if URL is a redirect wrapper (like cdn-vid) - ALWAYS follow redirect
+            if (isRedirectWrapper(url)) {
+                logger.info(`Redirect wrapper terdeteksi: ${url}`);
+                try {
+                    targetUrl = await followRedirect(url);
+                    logger.info(`Redirected to: ${targetUrl}`);
+                } catch (e) {
+                    logger.warn(`Redirect failed: ${e.message}`);
+                }
+            }
+
+            // Check if final URL is a direct video link (exclude fake direct links like cdn-vid)
+            const isFakeDirectLink = targetUrl.includes('cdn-vid') || targetUrl.includes('ct.ws');
+            const isDirectLink = /\.(mp4|mkv|webm|avi|mov)(\?.*)?$/i.test(targetUrl) && !isFakeDirectLink;
+
+            if (isDirectLink) {
+                // Direct link - no extraction needed
+                extractionDone = true;
+                clearInterval(animationInterval);
+                logger.info(`Direct link: ${targetUrl}`);
+
+                // Extract filename from URL
+                const urlPath = new URL(targetUrl).pathname;
+                const fileName = decodeURIComponent(urlPath.split('/').pop().replace(/\.(mp4|mkv|webm|avi|mov)$/i, ''));
+
+                videoInfo = {
+                    title: fileName || 'Direct Video',
+                    videoUrl: targetUrl
+                };
+            } else {
+                // Extract video info from embed page (30s max)
+                videoInfo = await Promise.race([
+                    this.extractor.extractVideoInfo(targetUrl),
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Extraction timeout')), 30000)
+                    )
+                ]);
+
+                extractionDone = true;
+                clearInterval(animationInterval);
+            }
 
             await ctx.telegram.editMessageText(chatId, statusMsgId, null, '📥 Mengunduh video...');
 
@@ -220,37 +272,66 @@ class DoodstreamBot {
             const filePath = path.join(this.downloadDir, `${Date.now()}_video.mp4`);
 
             try {
-                console.log('[Bot] Downloading video file...');
+                logger.download(`Memulai unduh: ${videoInfo.title || 'Video'}`);
 
                 const response = await axios({
                     method: 'get',
                     url: videoInfo.videoUrl,
                     responseType: 'stream',
-                    timeout: 300000,
+                    timeout: 180000, // 3 minutes timeout
                     headers: { 'Referer': referer }
                 });
 
+                const totalSize = parseInt(response.headers['content-length']) || 0;
+                let downloadedSize = 0;
+                let lastProgress = 0;
+
                 const writer = fs.createWriteStream(filePath);
+
+                // Progress logging
+                response.data.on('data', (chunk) => {
+                    downloadedSize += chunk.length;
+                    const progress = totalSize > 0 ? Math.floor((downloadedSize / totalSize) * 100) : 0;
+                    if (progress >= lastProgress + 20) { // Log every 20%
+                        logger.info(`Download progress: ${progress}% (${formatFileSize(downloadedSize)}/${formatFileSize(totalSize)})`);
+                        lastProgress = progress;
+                    }
+                });
+
                 response.data.pipe(writer);
                 await new Promise((resolve, reject) => {
                     writer.on('finish', resolve);
                     writer.on('error', reject);
+                    // Timeout for stuck downloads
+                    setTimeout(() => reject(new Error('Download stuck timeout')), 180000);
                 });
 
                 const actualSize = fs.statSync(filePath).size;
-                console.log(`[Bot] Download complete (${formatFileSize(actualSize)}), uploading to Telegram...`);
+                logger.download(`Unduhan selesai (${formatFileSize(actualSize)}), mengunggah ke Telegram...`);
 
                 // Always try to upload to Telegram
                 await ctx.telegram.editMessageText(chatId, statusMsgId, null, `📤 Mengunggah ke Telegram... (${formatFileSize(actualSize)})`);
 
                 try {
-                    await ctx.replyWithVideo(
-                        { source: filePath },
-                        {
-                            caption: `🎬 *${videoInfo.title || 'Video'}*\n📁 ${formatFileSize(actualSize)}`,
-                            parse_mode: 'Markdown'
-                        }
-                    );
+                    const uploadStart = Date.now();
+                    logger.info(`Memulai upload: ${formatFileSize(actualSize)}...`);
+
+                    // Upload with timeout (5 minutes for large files)
+                    await Promise.race([
+                        ctx.replyWithVideo(
+                            { source: filePath },
+                            {
+                                caption: `🎬 *${videoInfo.title || 'Video'}*\n📁 ${formatFileSize(actualSize)}`,
+                                parse_mode: 'Markdown'
+                            }
+                        ),
+                        new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('Upload timeout')), 300000)
+                        )
+                    ]);
+
+                    const uploadTime = ((Date.now() - uploadStart) / 1000).toFixed(1);
+                    logger.success(`Upload selesai dalam ${uploadTime}s`);
 
                     // Deduct quota ONLY after successful send
                     this.quotaManager.deductQuota(userId);
@@ -258,9 +339,9 @@ class DoodstreamBot {
 
                     await ctx.telegram.deleteMessage(chatId, statusMsgId).catch(() => { });
                     await ctx.reply(`💰 Sisa quota: *${newQuota}*`, { parse_mode: 'Markdown' });
-                    console.log('[Bot] Video sent successfully!');
+                    logger.success(`Video berhasil dikirim ke user ${userId}`);
                 } catch (uploadError) {
-                    console.log('[Bot] Upload failed, sending link instead:', uploadError.message);
+                    logger.warn(`Upload gagal, memberikan link: ${uploadError.message}`);
 
                     // Deduct quota even if upload fails but link is provided
                     this.quotaManager.deductQuota(userId);
@@ -325,6 +406,266 @@ class DoodstreamBot {
             activeDownloads: this.activeDownloads,
             isProcessing: this.isProcessing
         };
+    }
+
+    /**
+     * Handle batch download - downloads all files first, then sends all
+     * @param {Context} ctx 
+     * @param {string[]} urls 
+     */
+    async handleBatchDownload(ctx, urls) {
+        const userId = ctx.from.id;
+        const chatId = ctx.chat.id;
+        const totalUrls = urls.length;
+        const totalCost = totalUrls * this.quotaManager.DOWNLOAD_COST;
+
+        // Verify quota
+        if (!this.quotaManager.hasEnoughQuota(userId, totalCost)) {
+            return ctx.reply('❌ Quota tidak cukup untuk batch ini.');
+        }
+
+        logger.info(`Batch download dimulai: ${totalUrls} video untuk user ${userId}`);
+
+        // Status message
+        const statusMsg = await ctx.reply(
+            `📦 *Batch Download Started*\n\n` +
+            `🔗 Total: ${totalUrls} video\n` +
+            `⏳ Mengekstrak link... (0/${totalUrls})`,
+            { parse_mode: 'Markdown' }
+        );
+        const statusMsgId = statusMsg.message_id;
+
+        const downloadedFiles = [];
+        const failedUrls = [];
+        // Puppeteer doesn't work well with high parallelism - limit to 2
+        const PARALLEL_LIMIT = this.extractorMode === 'ytdlp' ? 5 : 2;
+
+        // Helper function to process single video
+        const processVideo = async (url, index) => {
+            logger.extract(`Memproses video ${index + 1}/${totalUrls}: ${url}`);
+
+            let videoInfo;
+            let targetUrl = url;
+
+            // Check if URL is a redirect wrapper
+            if (isRedirectWrapper(url)) {
+                logger.info(`Redirect wrapper: ${url}`);
+                try {
+                    targetUrl = await followRedirect(url);
+                    logger.info(`Redirected to: ${targetUrl}`);
+                } catch (e) {
+                    logger.warn(`Redirect failed: ${e.message}`);
+                }
+            }
+
+            // Check if direct link (exclude fake direct links like cdn-vid which use JS redirect)
+            const isFakeDirectLink = targetUrl.includes('cdn-vid') || targetUrl.includes('ct.ws');
+            const isDirectLink = /\.(mp4|mkv|webm|avi|mov)(\?.*)?$/i.test(targetUrl) && !isFakeDirectLink;
+
+            if (isDirectLink) {
+                logger.info(`Direct link: ${targetUrl}`);
+                const urlPath = new URL(targetUrl).pathname;
+                const fileName = decodeURIComponent(urlPath.split('/').pop().replace(/\.(mp4|mkv|webm|avi|mov)$/i, ''));
+                videoInfo = { title: fileName || `Video ${index + 1}`, videoUrl: targetUrl };
+            } else {
+                // Extract with timeout (30s max)
+                videoInfo = await Promise.race([
+                    this.extractor.extractVideoInfo(targetUrl),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 30000))
+                ]);
+            }
+
+            if (!videoInfo || !videoInfo.videoUrl) {
+                throw new Error('Tidak dapat extract');
+            }
+
+            logger.extract(`Link ditemukan: ${videoInfo.title || 'Video'}`);
+
+            // Download file
+            const referer = new URL(url).origin + '/';
+            const filePath = path.join(this.downloadDir, `batch_${Date.now()}_${index}.mp4`);
+
+            const response = await axios({
+                method: 'get',
+                url: videoInfo.videoUrl,
+                responseType: 'stream',
+                timeout: 300000,
+                headers: { 'Referer': referer }
+            });
+
+            const writer = fs.createWriteStream(filePath);
+            response.data.pipe(writer);
+            await new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+
+            const fileSize = fs.statSync(filePath).size;
+            logger.download(`Unduhan selesai: ${videoInfo.title} (${formatFileSize(fileSize)})`);
+
+            return {
+                path: filePath,
+                title: videoInfo.title || `Video ${index + 1}`,
+                size: fileSize,
+                url: videoInfo.videoUrl
+            };
+        };
+
+        // Phase 1: Process videos in parallel batches with retry logic
+        const MAX_RETRIES = 3;
+        let pendingUrls = urls.map((url, index) => ({ url, index, retries: 0 }));
+
+        while (pendingUrls.length > 0) {
+            // Take a batch from pending
+            const batch = pendingUrls.splice(0, PARALLEL_LIMIT);
+
+            // Update status
+            const retrying = batch.some(b => b.retries > 0);
+            await ctx.telegram.editMessageText(
+                chatId, statusMsgId, null,
+                `📦 *Batch Download*\n\n` +
+                `⏳ ${retrying ? '🔄 Retry: ' : 'Memproses: '}${batch.length} video\n` +
+                `✅ Berhasil: ${downloadedFiles.length}\n` +
+                `❌ Gagal: ${failedUrls.length}\n` +
+                `📋 Sisa: ${pendingUrls.length}`,
+                { parse_mode: 'Markdown' }
+            ).catch(() => { });
+
+            // Process batch in parallel
+            const results = await Promise.allSettled(
+                batch.map(item => processVideo(item.url, item.index))
+            );
+
+            // Collect results and queue retries
+            for (let i = 0; i < results.length; i++) {
+                const result = results[i];
+                const item = batch[i];
+
+                if (result.status === 'fulfilled') {
+                    downloadedFiles.push(result.value);
+                    logger.success(`Berhasil: ${item.url}`);
+                } else {
+                    // Check if should retry
+                    if (item.retries < MAX_RETRIES) {
+                        item.retries++;
+                        logger.warn(`Retry ${item.retries}/${MAX_RETRIES}: ${item.url}`);
+                        pendingUrls.push(item); // Add back to queue for retry
+                    } else {
+                        // Max retries reached, mark as failed
+                        logger.error(`Gagal setelah ${MAX_RETRIES}x retry: ${item.url}`);
+                        failedUrls.push({ url: item.url, reason: result.reason.message });
+                    }
+                }
+            }
+
+            // Small delay between batches to let resources recover
+            if (pendingUrls.length > 0) {
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+
+        // Update status before sending
+        await ctx.telegram.editMessageText(
+            chatId, statusMsgId, null,
+            `📦 *Batch Download*\n\n` +
+            `✅ Downloaded: ${downloadedFiles.length}/${totalUrls}\n` +
+            `📤 Mengirim ke Telegram...`,
+            { parse_mode: 'Markdown' }
+        ).catch(() => { });
+
+        // Phase 2: Send all downloaded files to Telegram
+        let sentCount = 0;
+        for (const file of downloadedFiles) {
+            try {
+                logger.info(`Mengirim ke Telegram: ${file.title} (${formatFileSize(file.size)})`);
+
+                // Try sending with timeout (5 minutes for large files)
+                let sendSuccess = false;
+                for (let attempt = 1; attempt <= 2 && !sendSuccess; attempt++) {
+                    try {
+                        await Promise.race([
+                            ctx.replyWithVideo(
+                                { source: file.path },
+                                {
+                                    caption: `🎬 *${file.title}*\n📁 ${formatFileSize(file.size)}`,
+                                    parse_mode: 'Markdown'
+                                }
+                            ),
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('Upload timeout')), 300000)
+                            )
+                        ]);
+                        sentCount++;
+                        sendSuccess = true;
+                        logger.success(`Berhasil dikirim: ${file.title}`);
+                    } catch (uploadErr) {
+                        if (attempt < 2) {
+                            logger.warn(`Upload gagal (attempt ${attempt}), retrying: ${uploadErr.message}`);
+                            await new Promise(r => setTimeout(r, 2000));
+                        } else {
+                            throw uploadErr;
+                        }
+                    }
+                }
+
+            } catch (sendError) {
+                logger.warn(`Gagal kirim ${file.title}, memberikan link: ${sendError.message}`);
+                try {
+                    await ctx.reply(
+                        `📥 *${file.title}*\n📁 ${formatFileSize(file.size)}\n\n⬇️ Download: ${file.url}`,
+                        { parse_mode: 'Markdown', disable_web_page_preview: true }
+                    );
+                    sentCount++;
+                } catch (linkError) {
+                    logger.error(`Gagal kirim link juga: ${linkError.message}`);
+                }
+            }
+
+            // Cleanup file
+            try {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            } catch (e) {
+                // Ignore cleanup errors
+            }
+        }
+
+        // Deduct quota for successful downloads only
+        const quotaToDeduct = sentCount * this.quotaManager.DOWNLOAD_COST;
+        const quotaSaved = failedUrls.length * this.quotaManager.DOWNLOAD_COST;
+
+        if (quotaToDeduct > 0) {
+            for (let i = 0; i < sentCount; i++) {
+                this.quotaManager.deductQuota(userId);
+            }
+        }
+        const newQuota = this.quotaManager.getQuota(userId);
+
+        // Final status
+        let summaryMessage = `📦 *Batch Download Selesai!*\n\n` +
+            `✅ Berhasil: ${sentCount}/${totalUrls}\n` +
+            `❌ Gagal: ${failedUrls.length}\n` +
+            `💰 Quota terpakai: ${quotaToDeduct}\n`;
+
+        if (quotaSaved > 0) {
+            summaryMessage += `🔄 Quota tidak dikurangi (gagal): ${quotaSaved}\n`;
+        }
+        summaryMessage += `📊 Sisa quota: ${newQuota}`;
+
+        await ctx.telegram.editMessageText(
+            chatId, statusMsgId, null,
+            summaryMessage,
+            { parse_mode: 'Markdown' }
+        ).catch(() => { });
+
+        logger.success(`Batch selesai: ${sentCount}/${totalUrls} video dikirim ke user ${userId}`);
+
+        // Report failed URLs if any
+        if (failedUrls.length > 0) {
+            const failedList = failedUrls.map((f, i) => `${i + 1}. ${f.url}`).join('\n');
+            await ctx.reply(`❌ *Video gagal diproses:*\n\n${failedList}`, { parse_mode: 'Markdown' });
+        }
     }
 
     /**

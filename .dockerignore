@@ -1,0 +1,32 @@
+# Node.js dependencies
+node_modules/
+
+# Environment files (keep .env.example)
+.env
+.env.local
+
+# Downloaded files
+downloads/
+*.mp4
+
+# Data files
+data/*.json
+
+# Log files
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+
+# Test
+coverage/

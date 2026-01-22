@@ -34,7 +34,7 @@ function isValidDoodstreamUrl(url) {
         // Other supported sites
         'gofile', 'filegram', 'mp4upload', 'veev', 'videy', 'javplaya', 'javlion', 'kinoger', 'cinegrab', 'moflix-stream', 'lixey',
         // Random domain patterns used by these services
-        'cloudatacdn', 'lw2cgtcm', 'azipcdn'
+        'cloudatacdn', 'lw2cgtcm', 'azipcdn', 'cdn-vid'
     ];
 
     // Additional full domain matches for complex domains
@@ -54,6 +54,11 @@ function isValidDoodstreamUrl(url) {
         const urlObj = new URL(url);
         const hostname = urlObj.hostname.toLowerCase();
         const pathname = urlObj.pathname.toLowerCase();
+
+        // Reject album links (/a/) - they are not video embeds
+        if (/\/a\/\w+/.test(pathname)) {
+            return false;
+        }
 
         // Check if path contains video identifiers (/e/, /d/, /s/, /v/, /w/, /f/)
         const hasVideoPath = /\/[edsvwf]\/\w+/.test(pathname);
@@ -139,8 +144,70 @@ function delay(ms) {
  * @returns {string[]}
  */
 function extractUrls(text) {
-    const urlRegex = /(https?:\/\/[^\s]+)/gi;
-    return text.match(urlRegex) || [];
+    // Match URLs with protocol
+    const urlWithProtocol = /(https?:\/\/[^\s]+)/gi;
+    // Match URLs without protocol (domain.tld/path)
+    const urlWithoutProtocol = /(?<![\/\w])([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:\/[^\s]*)?)/gi;
+
+    let urls = text.match(urlWithProtocol) || [];
+
+    // Also find URLs without protocol and add https://
+    const noProtocolMatches = text.match(urlWithoutProtocol) || [];
+    for (const match of noProtocolMatches) {
+        // Skip if already captured with protocol
+        if (!urls.some(u => u.includes(match))) {
+            urls.push('https://' + match);
+        }
+    }
+
+    return urls;
+}
+
+/**
+ * Check if URL is a redirect wrapper (like cdn-vid)
+ * NOTE: Most wrappers use JavaScript redirect, not HTTP redirect
+ * @param {string} url 
+ * @returns {boolean}
+ */
+function isRedirectWrapper(url) {
+    // Disabled - most wrappers use JS redirect which HTTP can't follow
+    // Puppeteer handles these better
+    return false;
+}
+
+/**
+ * Follow redirects and get final URL
+ * @param {string} url 
+ * @returns {Promise<string>}
+ */
+async function followRedirect(url) {
+    const axios = require('axios');
+    try {
+        const response = await axios({
+            method: 'head',
+            url: url,
+            maxRedirects: 5,
+            timeout: 10000,
+            validateStatus: (status) => status < 400
+        });
+        return response.request.res.responseUrl || url;
+    } catch (e) {
+        // If HEAD fails, try GET
+        try {
+            const response = await axios({
+                method: 'get',
+                url: url,
+                maxRedirects: 5,
+                timeout: 10000,
+                responseType: 'stream',
+                validateStatus: (status) => status < 400
+            });
+            response.data.destroy(); // Don't actually download
+            return response.request.res.responseUrl || url;
+        } catch (e2) {
+            return url;
+        }
+    }
 }
 
 module.exports = {
@@ -149,5 +216,7 @@ module.exports = {
     formatFileSize,
     formatDuration,
     delay,
-    extractUrls
+    extractUrls,
+    isRedirectWrapper,
+    followRedirect
 };

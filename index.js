@@ -8,10 +8,11 @@
 require('dotenv').config();
 const DoodstreamBot = require('./src/bot');
 const createWebhookServer = require('./src/webhook');
+const logger = require('./src/logger');
 
 // Check for required environment variables
 if (!process.env.BOT_TOKEN) {
-    console.error('❌ Error: BOT_TOKEN tidak ditemukan!');
+    logger.error('BOT_TOKEN tidak ditemukan!');
     console.error('');
     console.error('Langkah-langkah:');
     console.error('1. Buat file .env di root folder');
@@ -24,7 +25,20 @@ if (!process.env.BOT_TOKEN) {
 // Create and start bot
 const bot = new DoodstreamBot(process.env.BOT_TOKEN);
 
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (error) => {
+    logger.error(`Uncaught Exception: ${error.message}`);
+    // Don't exit - keep bot running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error(`Unhandled Rejection: ${reason}`);
+    // Don't exit - keep bot running
+});
+
 bot.start().then(() => {
+    logger.success('Bot berhasil dijalankan!');
+
     // Start webhook server for payments
     if (process.env.CASHI_API_KEY) {
         const webhookServer = createWebhookServer(
@@ -36,13 +50,13 @@ bot.start().then(() => {
 
         const PORT = process.env.WEBHOOK_PORT || 3000;
         webhookServer.listen(PORT, () => {
-            console.log(`💳 Payment webhook listening on port ${PORT}`);
-            console.log(`   Webhook URL: http://your-domain:${PORT}/webhook/cashi`);
+            logger.payment(`Webhook server aktif di port ${PORT}`);
+            logger.info(`Webhook URL: https://your-domain/webhook/cashi`);
         });
     } else {
-        console.log('⚠️  CASHI_API_KEY not set. Payment features disabled.');
+        logger.warn('CASHI_API_KEY tidak diset. Fitur payment dinonaktifkan.');
     }
 }).catch(error => {
-    console.error('❌ Failed to start bot:', error.message);
+    logger.error(`Gagal menjalankan bot: ${error.message}`);
     process.exit(1);
 });
