@@ -1,0 +1,82 @@
+[
+  {
+    "id": "txn_1769046623929_m0bj0o7ju",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T01:50:23.929Z"
+  },
+  {
+    "id": "txn_1769046969002_n66v9riup",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T01:56:09.003Z"
+  },
+  {
+    "id": "txn_1769047961623_4w6ebxnjy",
+    "userId": "1996372166",
+    "type": "topup",
+    "amount": 100,
+    "description": "Top up 100 quota via QRIS (TEST)",
+    "timestamp": "2026-01-22T02:12:41.623Z"
+  },
+  {
+    "id": "txn_1769048004273_anubzev6b",
+    "userId": "1996372166",
+    "type": "topup",
+    "amount": 1000,
+    "description": "Top up 1000 quota via QRIS (TEST)",
+    "timestamp": "2026-01-22T02:13:24.273Z"
+  },
+  {
+    "id": "txn_1769048927967_8yjnf19qs",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T02:28:47.967Z"
+  },
+  {
+    "id": "txn_1769049432776_c7pvbs8cw",
+    "userId": "1996372166",
+    "type": "bonus",
+    "amount": 50,
+    "description": "Daily Bonus 🎁",
+    "timestamp": "2026-01-22T02:37:12.776Z"
+  },
+  {
+    "id": "txn_1769049610139_66rlcetb9",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T02:40:10.139Z"
+  },
+  {
+    "id": "txn_1769050202670_3kvotv4kb",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T02:50:02.670Z"
+  },
+  {
+    "id": "txn_1769050357364_lajkic7cj",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T02:52:37.364Z"
+  },
+  {
+    "id": "txn_1769050433523_rd4p9438z",
+    "userId": "1996372166",
+    "type": "download",
+    "amount": -15,
+    "description": "Download video (-15 quota)",
+    "timestamp": "2026-01-22T02:53:53.523Z"
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "name": "doodstream-telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for downloading videos from Doodstream",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "doodstream",
+    "downloader"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.1",
+    "express": "^5.2.1",
+    "puppeteer": "^24.35.0",
+    "telegraf": "^4.15.3"
+  }
+}
