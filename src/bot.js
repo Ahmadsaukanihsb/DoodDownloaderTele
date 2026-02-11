@@ -437,6 +437,47 @@ class DoodstreamBot {
         );
         const statusMsgId = statusMsg.message_id;
 
+        // Spinner animation for status updates
+        const spinnerFrames = ['', '.', '..', '...'];
+        let spinnerIndex = 0;
+        let spinnerTimer = null;
+        let lastStatusBuilder = null;
+
+        const editStatus = async (builder) => {
+            lastStatusBuilder = builder;
+            const text = builder(spinnerFrames[spinnerIndex]);
+            await ctx.telegram.editMessageText(
+                chatId, statusMsgId, null, text,
+                { parse_mode: 'Markdown' }
+            ).catch(() => { });
+        };
+
+        const startSpinner = () => {
+            spinnerTimer = setInterval(() => {
+                if (!lastStatusBuilder) return;
+                spinnerIndex = (spinnerIndex + 1) % spinnerFrames.length;
+                const text = lastStatusBuilder(spinnerFrames[spinnerIndex]);
+                ctx.telegram.editMessageText(
+                    chatId, statusMsgId, null, text,
+                    { parse_mode: 'Markdown' }
+                ).catch(() => { });
+            }, 5000);
+        };
+
+        const stopSpinner = () => {
+            if (spinnerTimer) {
+                clearInterval(spinnerTimer);
+                spinnerTimer = null;
+            }
+        };
+
+        await editStatus((spin) =>
+            `📦 *Batch Download Started*\n\n` +
+            `🔗 Total: ${totalUrls} video\n` +
+            `⏳ Mengekstrak link${spin} (0/${totalUrls})`
+        );
+        startSpinner();
+
         const downloadedFiles = [];
         const failedUrls = [];
         // Puppeteer doesn't work well with high parallelism - limit to 2
@@ -518,156 +559,157 @@ class DoodstreamBot {
         const MAX_RETRIES = 3;
         let pendingUrls = urls.map((url, index) => ({ url, index, retries: 0 }));
 
-        while (pendingUrls.length > 0) {
-            // Take a batch from pending
-            const batch = pendingUrls.splice(0, PARALLEL_LIMIT);
+        try {
+            while (pendingUrls.length > 0) {
+                // Take a batch from pending
+                const batch = pendingUrls.splice(0, PARALLEL_LIMIT);
 
-            // Update status
-            const retrying = batch.some(b => b.retries > 0);
-            await ctx.telegram.editMessageText(
-                chatId, statusMsgId, null,
-                `📦 *Batch Download*\n\n` +
-                `⏳ ${retrying ? '🔄 Retry: ' : 'Memproses: '}${batch.length} video\n` +
-                `✅ Berhasil: ${downloadedFiles.length}\n` +
-                `❌ Gagal: ${failedUrls.length}\n` +
-                `📋 Sisa: ${pendingUrls.length}`,
-                { parse_mode: 'Markdown' }
-            ).catch(() => { });
+                // Update status
+                const retrying = batch.some(b => b.retries > 0);
+                await editStatus((spin) =>
+                    `📦 *Batch Download*\n\n` +
+                    `⏳ ${retrying ? '🔄 Retry: ' : 'Memproses: '}${batch.length} video${spin}\n` +
+                    `✅ Berhasil: ${downloadedFiles.length}\n` +
+                    `❌ Gagal: ${failedUrls.length}\n` +
+                    `📋 Sisa: ${pendingUrls.length}`
+                );
 
-            // Process batch in parallel
-            const results = await Promise.allSettled(
-                batch.map(item => processVideo(item.url, item.index))
-            );
+                // Process batch in parallel
+                const results = await Promise.allSettled(
+                    batch.map(item => processVideo(item.url, item.index))
+                );
 
-            // Collect results and queue retries
-            for (let i = 0; i < results.length; i++) {
-                const result = results[i];
-                const item = batch[i];
+                // Collect results and queue retries
+                for (let i = 0; i < results.length; i++) {
+                    const result = results[i];
+                    const item = batch[i];
 
-                if (result.status === 'fulfilled') {
-                    downloadedFiles.push(result.value);
-                    logger.success(`Berhasil: ${item.url}`);
-                } else {
-                    // Check if should retry
-                    if (item.retries < MAX_RETRIES) {
-                        item.retries++;
-                        logger.warn(`Retry ${item.retries}/${MAX_RETRIES}: ${item.url}`);
-                        pendingUrls.push(item); // Add back to queue for retry
+                    if (result.status === 'fulfilled') {
+                        downloadedFiles.push(result.value);
+                        logger.success(`Berhasil: ${item.url}`);
                     } else {
-                        // Max retries reached, mark as failed
-                        logger.error(`Gagal setelah ${MAX_RETRIES}x retry: ${item.url}`);
-                        failedUrls.push({ url: item.url, reason: result.reason.message });
-                    }
-                }
-            }
-
-            // Small delay between batches to let resources recover
-            if (pendingUrls.length > 0) {
-                await new Promise(r => setTimeout(r, 1000));
-            }
-        }
-
-        // Update status before sending
-        await ctx.telegram.editMessageText(
-            chatId, statusMsgId, null,
-            `📦 *Batch Download*\n\n` +
-            `✅ Downloaded: ${downloadedFiles.length}/${totalUrls}\n` +
-            `📤 Mengirim ke Telegram...`,
-            { parse_mode: 'Markdown' }
-        ).catch(() => { });
-
-        // Phase 2: Send all downloaded files to Telegram
-        let sentCount = 0;
-        for (const file of downloadedFiles) {
-            try {
-                logger.info(`Mengirim ke Telegram: ${file.title} (${formatFileSize(file.size)})`);
-
-                // Try sending with timeout (5 minutes for large files)
-                let sendSuccess = false;
-                for (let attempt = 1; attempt <= 2 && !sendSuccess; attempt++) {
-                    try {
-                        await Promise.race([
-                            ctx.replyWithVideo(
-                                { source: file.path },
-                                {
-                                    caption: `🎬 *${file.title}*\n📁 ${formatFileSize(file.size)}`,
-                                    parse_mode: 'Markdown'
-                                }
-                            ),
-                            new Promise((_, reject) =>
-                                setTimeout(() => reject(new Error('Upload timeout')), 300000)
-                            )
-                        ]);
-                        sentCount++;
-                        sendSuccess = true;
-                        logger.success(`Berhasil dikirim: ${file.title}`);
-                    } catch (uploadErr) {
-                        if (attempt < 2) {
-                            logger.warn(`Upload gagal (attempt ${attempt}), retrying: ${uploadErr.message}`);
-                            await new Promise(r => setTimeout(r, 2000));
+                        // Check if should retry
+                        if (item.retries < MAX_RETRIES) {
+                            item.retries++;
+                            logger.warn(`Retry ${item.retries}/${MAX_RETRIES}: ${item.url}`);
+                            pendingUrls.push(item); // Add back to queue for retry
                         } else {
-                            throw uploadErr;
+                            // Max retries reached, mark as failed
+                            logger.error(`Gagal setelah ${MAX_RETRIES}x retry: ${item.url}`);
+                            failedUrls.push({ url: item.url, reason: result.reason.message });
                         }
                     }
                 }
 
-            } catch (sendError) {
-                logger.warn(`Gagal kirim ${file.title}, memberikan link: ${sendError.message}`);
+                // Small delay between batches to let resources recover
+                if (pendingUrls.length > 0) {
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+            }
+
+            // Update status before sending
+            await editStatus((spin) =>
+                `📦 *Batch Download*\n\n` +
+                `✅ Downloaded: ${downloadedFiles.length}/${totalUrls}\n` +
+                `📤 Mengirim ke Telegram${spin}`
+            );
+
+            // Phase 2: Send all downloaded files to Telegram
+            let sentCount = 0;
+            for (const file of downloadedFiles) {
                 try {
-                    await ctx.reply(
-                        `📥 *${file.title}*\n📁 ${formatFileSize(file.size)}\n\n⬇️ Download: ${file.url}`,
-                        { parse_mode: 'Markdown', disable_web_page_preview: true }
-                    );
-                    sentCount++;
-                } catch (linkError) {
-                    logger.error(`Gagal kirim link juga: ${linkError.message}`);
+                    logger.info(`Mengirim ke Telegram: ${file.title} (${formatFileSize(file.size)})`);
+
+                    // Try sending with timeout (5 minutes for large files)
+                    let sendSuccess = false;
+                    for (let attempt = 1; attempt <= 2 && !sendSuccess; attempt++) {
+                        try {
+                            await Promise.race([
+                                ctx.replyWithVideo(
+                                    { source: file.path },
+                                    {
+                                        caption: `🎬 *${file.title}*\n📁 ${formatFileSize(file.size)}`,
+                                        parse_mode: 'Markdown'
+                                    }
+                                ),
+                                new Promise((_, reject) =>
+                                    setTimeout(() => reject(new Error('Upload timeout')), 300000)
+                                )
+                            ]);
+                            sentCount++;
+                            sendSuccess = true;
+                            logger.success(`Berhasil dikirim: ${file.title}`);
+                        } catch (uploadErr) {
+                            if (attempt < 2) {
+                                logger.warn(`Upload gagal (attempt ${attempt}), retrying: ${uploadErr.message}`);
+                                await new Promise(r => setTimeout(r, 2000));
+                            } else {
+                                throw uploadErr;
+                            }
+                        }
+                    }
+
+                } catch (sendError) {
+                    logger.warn(`Gagal kirim ${file.title}, memberikan link: ${sendError.message}`);
+                    try {
+                        await ctx.reply(
+                            `📥 *${file.title}*\n📁 ${formatFileSize(file.size)}\n\n⬇️ Download: ${file.url}`,
+                            { parse_mode: 'Markdown', disable_web_page_preview: true }
+                        );
+                        sentCount++;
+                    } catch (linkError) {
+                        logger.error(`Gagal kirim link juga: ${linkError.message}`);
+                    }
+                }
+
+                // Cleanup file
+                try {
+                    if (fs.existsSync(file.path)) {
+                        fs.unlinkSync(file.path);
+                    }
+                } catch (e) {
+                    // Ignore cleanup errors
                 }
             }
 
-            // Cleanup file
-            try {
-                if (fs.existsSync(file.path)) {
-                    fs.unlinkSync(file.path);
+            // Deduct quota for successful downloads only
+            const quotaToDeduct = sentCount * this.quotaManager.DOWNLOAD_COST;
+            const quotaSaved = failedUrls.length * this.quotaManager.DOWNLOAD_COST;
+
+            if (quotaToDeduct > 0) {
+                for (let i = 0; i < sentCount; i++) {
+                    this.quotaManager.deductQuota(userId);
                 }
-            } catch (e) {
-                // Ignore cleanup errors
             }
-        }
+            const newQuota = this.quotaManager.getQuota(userId);
 
-        // Deduct quota for successful downloads only
-        const quotaToDeduct = sentCount * this.quotaManager.DOWNLOAD_COST;
-        const quotaSaved = failedUrls.length * this.quotaManager.DOWNLOAD_COST;
+            // Final status
+            let summaryMessage = `📦 *Batch Download Selesai!*\n\n` +
+                `✅ Berhasil: ${sentCount}/${totalUrls}\n` +
+                `❌ Gagal: ${failedUrls.length}\n` +
+                `💰 Quota terpakai: ${quotaToDeduct}\n`;
 
-        if (quotaToDeduct > 0) {
-            for (let i = 0; i < sentCount; i++) {
-                this.quotaManager.deductQuota(userId);
+            if (quotaSaved > 0) {
+                summaryMessage += `🔄 Quota tidak dikurangi (gagal): ${quotaSaved}\n`;
             }
-        }
-        const newQuota = this.quotaManager.getQuota(userId);
+            summaryMessage += `📊 Sisa quota: ${newQuota}`;
 
-        // Final status
-        let summaryMessage = `📦 *Batch Download Selesai!*\n\n` +
-            `✅ Berhasil: ${sentCount}/${totalUrls}\n` +
-            `❌ Gagal: ${failedUrls.length}\n` +
-            `💰 Quota terpakai: ${quotaToDeduct}\n`;
+            stopSpinner();
+            await ctx.telegram.editMessageText(
+                chatId, statusMsgId, null,
+                summaryMessage,
+                { parse_mode: 'Markdown' }
+            ).catch(() => { });
 
-        if (quotaSaved > 0) {
-            summaryMessage += `🔄 Quota tidak dikurangi (gagal): ${quotaSaved}\n`;
-        }
-        summaryMessage += `📊 Sisa quota: ${newQuota}`;
+            logger.success(`Batch selesai: ${sentCount}/${totalUrls} video dikirim ke user ${userId}`);
 
-        await ctx.telegram.editMessageText(
-            chatId, statusMsgId, null,
-            summaryMessage,
-            { parse_mode: 'Markdown' }
-        ).catch(() => { });
-
-        logger.success(`Batch selesai: ${sentCount}/${totalUrls} video dikirim ke user ${userId}`);
-
-        // Report failed URLs if any
-        if (failedUrls.length > 0) {
-            const failedList = failedUrls.map((f, i) => `${i + 1}. ${f.url}`).join('\n');
-            await ctx.reply(`❌ *Video gagal diproses:*\n\n${failedList}`, { parse_mode: 'Markdown' });
+            // Report failed URLs if any
+            if (failedUrls.length > 0) {
+                const failedList = failedUrls.map((f, i) => `${i + 1}. ${f.url}`).join('\n');
+                await ctx.reply(`❌ *Video gagal diproses:*\n\n${failedList}`, { parse_mode: 'Markdown' });
+            }
+        } finally {
+            stopSpinner();
         }
     }
 
