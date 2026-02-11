@@ -15,14 +15,20 @@ function setupCommandHandlers(bot) {
         const { canClaim } = bot.quotaManager.canClaimDailyBonus(userId);
         const bonusText = canClaim ? '🎁 Bonus Harian' : '⏰ Bonus (Claimed)';
 
+        const buttons = [
+            [Markup.button.callback('📥 Download Video', 'download')],
+            [Markup.button.callback('💰 Cek Quota', 'show_quota'), Markup.button.callback('💳 Top Up', 'show_topup')],
+            [Markup.button.callback(bonusText, 'claim_bonus')],
+            [Markup.button.callback('📖 Bantuan', 'help'), Markup.button.callback('🔗 Support URL', 'platforms')]
+        ];
+
+        if (String(userId) === String(bot.ADMIN_ID)) {
+            buttons.push([Markup.button.callback('🛠 Admin Panel', 'admin_panel')]);
+        }
+
         await ctx.replyWithMarkdown(
             `🎬 *Selamat datang di Video Downloader Bot!*\n\n💰 Quota Anda: *${quota}*\n📥 Biaya: *15 quota/download*\n\nKirim link video untuk download!`,
-            Markup.inlineKeyboard([
-                [Markup.button.callback('📥 Download Video', 'download')],
-                [Markup.button.callback('💰 Cek Quota', 'show_quota'), Markup.button.callback('💳 Top Up', 'show_topup')],
-                [Markup.button.callback(bonusText, 'claim_bonus')],
-                [Markup.button.callback('📖 Bantuan', 'help'), Markup.button.callback('🔗 Support URL', 'platforms')]
-            ])
+            Markup.inlineKeyboard(buttons)
         );
     });
 

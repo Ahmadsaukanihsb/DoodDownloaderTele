@@ -1,4 +1,5 @@
 const { Markup } = require('telegraf');
+const logger = require('../logger');
 
 /**
  * Setup callback query handlers
@@ -298,6 +299,58 @@ _Order ID: ${result.orderId}_
         );
     });
 
+    // Admin Panel
+    bot.bot.action('admin_panel', async (ctx) => {
+        await ctx.answerCbQuery();
+        if (String(ctx.from.id) !== String(bot.ADMIN_ID)) return;
+
+        const stats = bot.quotaManager.getStats();
+        const queueStatus = bot.getQueueStatus();
+
+        await ctx.editMessageText(
+            `📊 *Admin Dashboard*\n\n` +
+            `👥 *Users:*\n` +
+            `• All Time: ${stats.totalUsers}\n` +
+            `• Active Today: ${stats.activeToday}\n\n` +
+            `📈 *Stats:*\n` +
+            `• Downloads: ${stats.totalDownloads}\n` +
+            `• Quota Issued: ${stats.totalQuotaIssued}\n\n` +
+            `📋 *Queue:*\n` +
+            `• Active: ${queueStatus.activeDownloads}\n` +
+            `• Waiting: ${queueStatus.queueLength}`,
+            {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('➕ Tambah Quota User', 'admin_add_quota')],
+                    [Markup.button.callback('📢 Broadcast', 'admin_broadcast'), Markup.button.callback('🔄 Refresh', 'admin_refresh')],
+                    [Markup.button.callback('🔙 Menu Utama', 'back_to_start')]
+                ])
+            }
+        );
+    });
+
+    // Admin Add Quota Action
+    bot.bot.action('admin_add_quota', async (ctx) => {
+        await ctx.answerCbQuery();
+        if (String(ctx.from.id) !== String(bot.ADMIN_ID)) return;
+
+        bot.adminStates.set(ctx.from.id, 'add_quota');
+
+        await ctx.editMessageText(
+            `➕ *Tambah Quota Manual*\n\n` +
+            `Silakan kirim pesan dengan format:\n` +
+            `\`<user_id> <jumlah_quota>\`\n\n` +
+            `Contoh:\n` +
+            `\`123456789 100\``,
+            {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('🔙 Kembali', 'admin_panel')]
+                ])
+            }
+        );
+    });
+
     // Batch download confirmation
     bot.bot.action(/^batch_confirm_(.+)$/, async (ctx) => {
         await ctx.answerCbQuery('Memproses batch download...');
@@ -330,8 +383,14 @@ _Order ID: ${result.orderId}_
         // Delete confirmation message
         await ctx.deleteMessage().catch(() => { });
 
-        // Use new batch download method - downloads all first, then sends all
-        await bot.handleBatchDownload(ctx, urls);
+        // Run batch in background to avoid Telegraf handler timeout
+        bot.handleBatchDownload(ctx, urls).catch((err) => {
+            logger.error(`Batch download error: ${err.message}`);
+            try {
+                ctx.reply('❌ Terjadi kesalahan saat memproses batch. Coba lagi nanti.');
+            } catch (e) { }
+        });
+        return;
     });
 }
 

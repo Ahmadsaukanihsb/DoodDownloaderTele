@@ -34,7 +34,7 @@ function isValidDoodstreamUrl(url) {
         // Other supported sites
         'gofile', 'filegram', 'mp4upload', 'veev', 'videy', 'javplaya', 'javlion', 'kinoger', 'cinegrab', 'moflix-stream', 'lixey',
         // Random domain patterns used by these services
-        'cloudatacdn', 'lw2cgtcm', 'azipcdn', 'cdn-vid'
+        'cloudatacdn', 'lw2cgtcm', 'azipcdn', 'cdn-vid', 'clubcheap'
     ];
 
     // Additional full domain matches for complex domains

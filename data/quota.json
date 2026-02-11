@@ -1,10 +1,25 @@
 {
   "1996372166": {
-    "quota": 100435,
-    "totalDownloads": 51,
+    "quota": 100450,
+    "totalDownloads": 60,
     "totalSpent": 101100,
     "createdAt": "2026-01-22T01:47:38.339Z",
-    "lastActive": "2026-01-22T06:27:00.283Z",
-    "lastDailyBonus": "2026-01-22T02:37:12.775Z"
+    "lastActive": "2026-01-27T15:41:11.734Z",
+    "lastDailyBonus": "2026-01-26T11:46:07.621Z"
+  },
+  "6105382222": {
+    "quota": 35,
+    "totalDownloads": 1,
+    "totalSpent": 0,
+    "createdAt": "2026-01-22T09:36:17.246Z",
+    "lastActive": "2026-01-22T09:39:23.205Z"
+  },
+  "8466304297": {
+    "quota": 9999995,
+    "totalDownloads": 7,
+    "totalSpent": 10000000,
+    "createdAt": "2026-01-27T15:22:36.938Z",
+    "lastActive": "2026-01-27T15:45:57.183Z",
+    "lastDailyBonus": "2026-01-27T15:22:53.104Z"
   }
 }

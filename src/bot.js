@@ -60,7 +60,9 @@ class DoodstreamBot {
 
         // State management
         this.waitingForUrl = new Map();
+        this.waitingForUrl = new Map();
         this.userCooldowns = new Map();
+        this.adminStates = new Map();
 
         // Queue system
         this.downloadQueue = [];
@@ -438,7 +440,8 @@ class DoodstreamBot {
         const downloadedFiles = [];
         const failedUrls = [];
         // Puppeteer doesn't work well with high parallelism - limit to 2
-        const PARALLEL_LIMIT = this.extractorMode === 'ytdlp' ? 5 : 2;
+        // Limit to 1 to prevent network saturation and bot unresponsiveness
+        const PARALLEL_LIMIT = 1;
 
         // Helper function to process single video
         const processVideo = async (url, index) => {
