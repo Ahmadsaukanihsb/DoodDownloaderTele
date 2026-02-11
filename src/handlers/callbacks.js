@@ -383,6 +383,9 @@ _Order ID: ${result.orderId}_
         // Delete confirmation message
         await ctx.deleteMessage().catch(() => { });
 
+        // Immediate user feedback
+        await ctx.reply(`✅ Batch diterima. Sedang memproses ${urls.length} video...`);
+
         // Run batch in background to avoid Telegraf handler timeout
         bot.handleBatchDownload(ctx, urls).catch((err) => {
             logger.error(`Batch download error: ${err.message}`);
